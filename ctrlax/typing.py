@@ -1,4 +1,5 @@
-from typing import Any, Callable, Dict, Protocol, Tuple
+from collections.abc import Callable
+from typing import Any, Protocol
 
 import jax
 
@@ -9,10 +10,10 @@ PyTree = Any
 DynamicsState = PyTree
 Observation = PyTree
 Action = PyTree
-InfoDict = Dict[str, Any]
+InfoDict = dict[str, Any]
 SolverState = PyTree
 
-Dynamics = Callable[[Key, DynamicsState, Action], Tuple[DynamicsState, Observation]]
+Dynamics = Callable[[Key, DynamicsState, Action], tuple[DynamicsState, Observation]]
 TrajectoryCostFn = Callable[[Observation, Action], Array]
 
 
@@ -43,4 +44,4 @@ class Solver(Protocol):
         key: Key,
         state: SolverState,
         dynamics_state: DynamicsState,
-    ) -> Tuple[Action, SolverState, InfoDict]: ...
+    ) -> tuple[Action, SolverState, InfoDict]: ...

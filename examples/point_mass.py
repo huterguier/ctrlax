@@ -6,7 +6,7 @@ vs. observation (what cost_fn sees) split that matches gxm.Dynamics.step's real
 (next_state, observation) shape.
 """
 
-from typing import NamedTuple, Tuple
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -21,7 +21,9 @@ class PointMassState(NamedTuple):
     vel: jax.Array
 
 
-def toy_dynamics(key: jax.Array, state: PointMassState, action: jax.Array) -> Tuple[PointMassState, PointMassState]:
+def toy_dynamics(
+    key: jax.Array, state: PointMassState, action: jax.Array
+) -> tuple[PointMassState, PointMassState]:
     del key  # deterministic toy dynamics
     accel = action[0]
     new_vel = state.vel + accel * DT
@@ -36,6 +38,6 @@ def cost_fn(observations: PointMassState, actions: jax.Array) -> jax.Array:
     return pos_cost + action_cost
 
 
-def bounds() -> Tuple[jax.Array, jax.Array]:
+def bounds() -> tuple[jax.Array, jax.Array]:
     """The point mass's action-space bounds, as the plain arrays solvers take."""
     return jnp.full((1,), -ACTION_BOUND), jnp.full((1,), ACTION_BOUND)

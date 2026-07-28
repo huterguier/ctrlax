@@ -1,5 +1,3 @@
-from typing import Optional
-
 import jax
 import jax.numpy as jnp
 
@@ -11,8 +9,8 @@ def sample_gaussian_actions(
     mean: Action,
     std: Action,
     num_samples: int,
-    low: Optional[Action] = None,
-    high: Optional[Action] = None,
+    low: Action | None = None,
+    high: Action | None = None,
 ) -> Action:
     """Draws num_samples i.i.d. action-sequence candidates from N(mean, std), per leaf.
 
@@ -25,7 +23,8 @@ def sample_gaussian_actions(
     leaf_keys = jax.random.split(key, len(mean_leaves))
 
     sampled_leaves = [
-        mean_leaf[None] + std_leaf[None] * jax.random.normal(k, (num_samples, *mean_leaf.shape))
+        mean_leaf[None]
+        + std_leaf[None] * jax.random.normal(k, (num_samples, *mean_leaf.shape))
         for k, mean_leaf, std_leaf in zip(leaf_keys, mean_leaves, std_leaves)
     ]
     samples = jax.tree_util.tree_unflatten(treedef, sampled_leaves)

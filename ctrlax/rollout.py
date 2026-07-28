@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import jax
 
 from ctrlax.typing import Action, Dynamics, DynamicsState, Key, Observation
@@ -20,7 +18,9 @@ def rollout(
     horizon = jax.tree_util.tree_leaves(actions)[0].shape[0]
     step_keys = jax.random.split(key, horizon)
 
-    def step(state: DynamicsState, inputs: Tuple[Key, Action]) -> Tuple[DynamicsState, Observation]:
+    def step(
+        state: DynamicsState, inputs: tuple[Key, Action]
+    ) -> tuple[DynamicsState, Observation]:
         step_key, action = inputs
         next_state, obs = dynamics(step_key, state, action)
         return next_state, obs

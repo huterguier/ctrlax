@@ -1,10 +1,12 @@
 from dataclasses import dataclass
-from typing import NamedTuple, Tuple
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
 
 from ctrlax.rollout import rollout
+from ctrlax.solvers._sampling import sample_gaussian_actions
+from ctrlax.solvers._spaces import validate_matching_bounds, zeros_mean
 from ctrlax.typing import (
     Action,
     Array,
@@ -15,8 +17,6 @@ from ctrlax.typing import (
     SolverState,
     TrajectoryCostFn,
 )
-from ctrlax.solvers._sampling import sample_gaussian_actions
-from ctrlax.solvers._spaces import validate_matching_bounds, zeros_mean
 
 _MIN_STD = 1e-3
 
@@ -76,8 +76,10 @@ class CEM:
         key: Key,
         state: SolverState,
         dynamics_state: DynamicsState,
-    ) -> Tuple[Action, SolverState, InfoDict]:
-        std0 = jax.tree_util.tree_map(lambda leaf: jnp.full_like(leaf, self.init_std), state.mean)
+    ) -> tuple[Action, SolverState, InfoDict]:
+        std0 = jax.tree_util.tree_map(
+            lambda leaf: jnp.full_like(leaf, self.init_std), state.mean
+        )
         iteration_keys = jax.random.split(key, self.num_iterations)
 
         def rollout_and_score(k: Key, actions: Action) -> Array:
@@ -88,7 +90,9 @@ class CEM:
             mean, std = carry
             sample_key, rollout_key = jax.random.split(iter_key)
 
-            candidates = sample_gaussian_actions(sample_key, mean, std, self.num_samples, self.low, self.high)
+            candidates = sample_gaussian_actions(
+                sample_key, mean, std, self.num_samples, self.low, self.high
+            )
             rollout_keys = jax.random.split(rollout_key, self.num_samples)
             costs = jax.vmap(rollout_and_score)(rollout_keys, candidates)
 
@@ -96,7 +100,9 @@ class CEM:
             elites = jax.tree_util.tree_map(lambda c: c[elite_idx], candidates)
 
             new_mean = jax.tree_util.tree_map(lambda e: jnp.mean(e, axis=0), elites)
-            new_std = jax.tree_util.tree_map(lambda e: jnp.maximum(jnp.std(e, axis=0), _MIN_STD), elites)
+            new_std = jax.tree_util.tree_map(
+                lambda e: jnp.maximum(jnp.std(e, axis=0), _MIN_STD), elites
+            )
 
             return (new_mean, new_std), costs[elite_idx[0]]
 
@@ -104,5 +110,8 @@ class CEM:
             refine, (state.mean, std0), iteration_keys
         )
 
-        info = {"best_cost": best_cost_per_iteration[-1], "best_cost_per_iteration": best_cost_per_iteration}
+        info = {
+            "best_cost": best_cost_per_iteration[-1],
+            "best_cost_per_iteration": best_cost_per_iteration,
+        }
         return final_mean, CEMState(mean=_shift_mean(final_mean)), info

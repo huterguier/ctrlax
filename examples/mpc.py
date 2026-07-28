@@ -7,16 +7,18 @@ Proves ctrlax's init/step/rollout contract wires together correctly.
 
 import jax
 import jax.numpy as jnp
+from point_mass import PointMassState, bounds, cost_fn, toy_dynamics
 
 import ctrlax as cx
-from point_mass import PointMassState, bounds, cost_fn, toy_dynamics
 
 
 def main():
     horizon = 20
     low, high = bounds()
 
-    solver = cx.solvers.RandomShooting(toy_dynamics, cost_fn, low, high, horizon, num_samples=500, std=2.0)
+    solver = cx.solvers.RandomShooting(
+        toy_dynamics, cost_fn, low, high, horizon, num_samples=500, std=2.0
+    )
     solver_state = solver.init()
 
     key = jax.random.key(0)

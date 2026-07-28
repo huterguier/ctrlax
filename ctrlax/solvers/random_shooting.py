@@ -1,10 +1,12 @@
 from dataclasses import dataclass
-from typing import NamedTuple, Tuple
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
 
 from ctrlax.rollout import rollout
+from ctrlax.solvers._sampling import sample_gaussian_actions
+from ctrlax.solvers._spaces import validate_matching_bounds, zeros_mean
 from ctrlax.typing import (
     Action,
     Array,
@@ -15,8 +17,6 @@ from ctrlax.typing import (
     SolverState,
     TrajectoryCostFn,
 )
-from ctrlax.solvers._sampling import sample_gaussian_actions
-from ctrlax.solvers._spaces import validate_matching_bounds, zeros_mean
 
 
 class RandomShootingState(NamedTuple):
@@ -54,7 +54,9 @@ class RandomShooting:
 
     def init(self) -> SolverState:
         mean = zeros_mean(self.low, self.horizon)
-        std_tree = jax.tree_util.tree_map(lambda leaf: jnp.full_like(leaf, self.std), mean)
+        std_tree = jax.tree_util.tree_map(
+            lambda leaf: jnp.full_like(leaf, self.std), mean
+        )
         return RandomShootingState(mean=mean, std=std_tree)
 
     def step(
@@ -62,7 +64,7 @@ class RandomShooting:
         key: Key,
         state: SolverState,
         dynamics_state: DynamicsState,
-    ) -> Tuple[Action, SolverState, InfoDict]:
+    ) -> tuple[Action, SolverState, InfoDict]:
         sample_key, rollout_key = jax.random.split(key)
 
         candidates = sample_gaussian_actions(

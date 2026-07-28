@@ -6,7 +6,9 @@ from ctrlax.typing import Action
 
 def zeros_mean(low: Action, horizon: int) -> Action:
     """Builds a zero-initialized action sequence, matching low's own per-leaf shape/dtype."""
-    return jax.tree_util.tree_map(lambda leaf: jnp.zeros((horizon, *leaf.shape), dtype=leaf.dtype), low)
+    return jax.tree_util.tree_map(
+        lambda leaf: jnp.zeros((horizon, *leaf.shape), dtype=leaf.dtype), low
+    )
 
 
 def validate_matching_bounds(low: Action, high: Action, solver_name: str) -> None:
