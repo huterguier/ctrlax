@@ -25,7 +25,9 @@ def sample_gaussian_actions(
     sampled_leaves = [
         mean_leaf[None]
         + std_leaf[None] * jax.random.normal(k, (num_samples, *mean_leaf.shape))
-        for k, mean_leaf, std_leaf in zip(leaf_keys, mean_leaves, std_leaves)
+        for k, mean_leaf, std_leaf in zip(
+            leaf_keys, mean_leaves, std_leaves, strict=True
+        )
     ]
     samples = jax.tree_util.tree_unflatten(treedef, sampled_leaves)
 
