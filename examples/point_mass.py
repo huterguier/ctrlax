@@ -2,7 +2,7 @@
 
 Deliberately depends on nothing but jax, so the examples exercise ctrlax's
 init/step/rollout contract on their own — including the state (dynamics carry)
-vs. observation (what cost_fn sees) split that matches gxm.Model.step's real
+vs. observation (what cost_fn sees) split that matches gxm.Dynamics.step's real
 (next_state, observation) shape.
 """
 
@@ -21,7 +21,7 @@ class PointMassState(NamedTuple):
     vel: jax.Array
 
 
-def toy_model(key: jax.Array, state: PointMassState, action: jax.Array) -> Tuple[PointMassState, PointMassState]:
+def toy_dynamics(key: jax.Array, state: PointMassState, action: jax.Array) -> Tuple[PointMassState, PointMassState]:
     del key  # deterministic toy dynamics
     accel = action[0]
     new_vel = state.vel + accel * DT

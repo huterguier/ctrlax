@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
 import ctrlax as cx
-from point_mass import GOAL, PointMassState, bounds, cost_fn, toy_model
+from point_mass import GOAL, PointMassState, bounds, cost_fn, toy_dynamics
 
 OUTPUT_PATH = Path(__file__).parent / "compare.png"
 
@@ -36,24 +36,24 @@ def run(solver, num_steps=NUM_STEPS):
     solver_state = solver.init()
 
     key = jax.random.key(SEED)
-    model_state = PointMassState(pos=jnp.array(0.0), vel=jnp.array(0.0))
+    dynamics_state = PointMassState(pos=jnp.array(0.0), vel=jnp.array(0.0))
 
     positions, best_costs = [], []
     for _ in range(num_steps):
         key, plan_key, env_key = jax.random.split(key, 3)
-        plan, solver_state, info = solver.step(plan_key, solver_state, model_state)
+        plan, solver_state, info = solver.step(plan_key, solver_state, dynamics_state)
         action = jax.tree_util.tree_map(lambda leaf: leaf[0], plan)
-        model_state, _ = toy_model(env_key, model_state, action)
-        positions.append(float(model_state.pos))
+        dynamics_state, _ = toy_dynamics(env_key, dynamics_state, action)
+        positions.append(float(dynamics_state.pos))
         best_costs.append(float(info["best_cost"]))
     return positions, best_costs
 
 
 def main():
     low, high = bounds()
-    random_shooting = cx.solvers.RandomShooting(toy_model, cost_fn, low, high, HORIZON, num_samples=1000, std=2.0)
+    random_shooting = cx.solvers.RandomShooting(toy_dynamics, cost_fn, low, high, HORIZON, num_samples=1000, std=2.0)
     cem = cx.solvers.CEM(
-        toy_model, cost_fn, low, high, HORIZON, num_samples=200, num_elites=20, num_iterations=5, init_std=2.0
+        toy_dynamics, cost_fn, low, high, HORIZON, num_samples=200, num_elites=20, num_iterations=5, init_std=2.0
     )
 
     rs_pos, rs_cost = run(random_shooting)

@@ -8,11 +8,11 @@ from ctrlax.rollout import rollout
 from ctrlax.typing import (
     Action,
     Array,
+    Dynamics,
+    DynamicsState,
     InfoDict,
     Key,
-    ModelState,
     SolverState,
-    TransitionModel,
     TrajectoryCostFn,
 )
 from ctrlax.solvers._sampling import sample_gaussian_actions
@@ -36,12 +36,12 @@ class RandomShooting:
     array PyTrees, matching the action's own structure) — not a Space object.
     low/high are validated to have matching structure at construction time.
 
-    model/cost_fn are static config, same as every other field — bound once
+    dynamics/cost_fn are static config, same as every other field — bound once
     at construction, matching the "one solver instance is fully bound to one
     problem" principle already used for low/high/horizon.
     """
 
-    model: TransitionModel
+    dynamics: Dynamics
     cost_fn: TrajectoryCostFn
     low: Action
     high: Action
@@ -61,7 +61,7 @@ class RandomShooting:
         self,
         key: Key,
         state: SolverState,
-        model_state: ModelState,
+        dynamics_state: DynamicsState,
     ) -> Tuple[Action, SolverState, InfoDict]:
         sample_key, rollout_key = jax.random.split(key)
 
@@ -70,7 +70,7 @@ class RandomShooting:
         )
 
         def rollout_and_score(k: Key, actions: Action) -> Array:
-            observations = rollout(k, model_state, actions, self.model)
+            observations = rollout(k, dynamics_state, actions, self.dynamics)
             return self.cost_fn(observations, actions)
 
         rollout_keys = jax.random.split(rollout_key, self.num_samples)
