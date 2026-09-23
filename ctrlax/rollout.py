@@ -1,6 +1,14 @@
 import jax
 
-from ctrlax.typing import Action, Dynamics, DynamicsState, Key, Observation
+from ctrlax.typing import (
+    Action,
+    Array,
+    Dynamics,
+    DynamicsState,
+    Key,
+    Observation,
+    TrajectoryCostFn,
+)
 
 
 def rollout(
@@ -9,21 +17,30 @@ def rollout(
     actions: Action,
     dynamics: Dynamics,
 ) -> Observation:
-    """Rolls actions forward through dynamics via lax.scan.
+    """Returns the observation after each action; the dynamics state is not returned."""
+    horizon = jax.tree.leaves(actions)[0].shape[0]
+    keys = jax.random.split(key, horizon)
 
-    Raw dynamics state is only ever the scan's internal carry (required to keep
-    calling dynamics()) — never returned. Returns the *observations* reached after
-    each action (length == horizon); dynamics_state itself is not included.
-    """
-    horizon = jax.tree_util.tree_leaves(actions)[0].shape[0]
-    step_keys = jax.random.split(key, horizon)
+    def step(state, inputs):
+        key_step, action = inputs
+        return dynamics(key_step, state, action)
 
-    def step(
-        state: DynamicsState, inputs: tuple[Key, Action]
-    ) -> tuple[DynamicsState, Observation]:
-        step_key, action = inputs
-        next_state, obs = dynamics(step_key, state, action)
-        return next_state, obs
-
-    _, observations = jax.lax.scan(step, dynamics_state, (step_keys, actions))
+    _, observations = jax.lax.scan(step, dynamics_state, (keys, actions))
     return observations
+
+
+def score_candidates(
+    key: Key,
+    dynamics_state: DynamicsState,
+    candidates: Action,
+    dynamics: Dynamics,
+    cost_fn: TrajectoryCostFn,
+) -> Array:
+    """Cost of each (num_candidates, horizon, ...) candidate from dynamics_state."""
+    num_candidates = jax.tree.leaves(candidates)[0].shape[0]
+    keys = jax.random.split(key, num_candidates)
+
+    def score(key, actions):
+        return cost_fn(rollout(key, dynamics_state, actions, dynamics), actions)
+
+    return jax.vmap(score)(keys, candidates)

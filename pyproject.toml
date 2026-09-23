@@ -5,19 +5,22 @@ description = "Control algorithms in JAX."
 readme = "README.md"
 requires-python = ">=3.12.13"
 dependencies = [
-    "jax>=0.6.2",
+    "jax>=0.7.0",
+    "lox@git+https://github.com/huterguier/lox",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel]
 packages = ["ctrlax"]
 
 [tool.ruff]
 target-version = "py312"
-line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B"]
@@ -26,5 +29,6 @@ ignore = ["E501"]
 [dependency-groups]
 dev = [
     "matplotlib>=3.11.0",
+    "pytest",
     "ruff",
 ]

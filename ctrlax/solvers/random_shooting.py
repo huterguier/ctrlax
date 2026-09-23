@@ -1,45 +1,23 @@
 from dataclasses import dataclass
-from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
+import lox
 
-from ctrlax.rollout import rollout
-from ctrlax.solvers._sampling import sample_gaussian_actions
-from ctrlax.solvers._spaces import validate_matching_bounds, zeros_mean
-from ctrlax.typing import (
-    Action,
-    Array,
-    Dynamics,
-    DynamicsState,
-    InfoDict,
-    Key,
-    SolverState,
-    TrajectoryCostFn,
+from ctrlax.rollout import score_candidates
+from ctrlax.solvers._actions import (
+    sample_gaussian_actions,
+    validate_matching_bounds,
+    zeros_mean,
 )
-
-
-class RandomShootingState(NamedTuple):
-    """Fixed sampling distribution — never adapted between calls."""
-
-    mean: Action
-    std: Action
+from ctrlax.typing import Action, Dynamics, DynamicsState, Key, TrajectoryCostFn
 
 
 @dataclass(frozen=True)
 class RandomShooting:
-    """Simplest shooting solver: draw num_samples action sequences from a fixed
-    zero-mean Gaussian, roll each out, and return the lowest-cost one. No inner
-    refinement loop, no warm-starting.
-
-    Continuous action spaces only, described directly by low/high bounds (real
-    array PyTrees, matching the action's own structure) — not a Space object.
-    low/high are validated to have matching structure at construction time.
-
-    dynamics/cost_fn are static config, same as every other field — bound once
-    at construction, matching the "one solver instance is fully bound to one
-    problem" principle already used for low/high/horizon.
-    """
+    """Sample num_samples action sequences from a zero-mean Gaussian and return
+    the lowest-cost one. Stateless. Logs "best_cost" and "mean_cost", tagged
+    "ctrlax"."""
 
     dynamics: Dynamics
     cost_fn: TrajectoryCostFn
@@ -50,36 +28,35 @@ class RandomShooting:
     std: float = 1.0
 
     def __post_init__(self):
-        validate_matching_bounds(self.low, self.high, "RandomShooting")
+        validate_matching_bounds(self.low, self.high, type(self).__name__)
 
-    def init(self) -> SolverState:
-        mean = zeros_mean(self.low, self.horizon)
-        std_tree = jax.tree_util.tree_map(
-            lambda leaf: jnp.full_like(leaf, self.std), mean
-        )
-        return RandomShootingState(mean=mean, std=std_tree)
+    def init(self) -> None:
+        return None
 
     def step(
         self,
         key: Key,
-        state: SolverState,
+        state: None,
         dynamics_state: DynamicsState,
-    ) -> tuple[Action, SolverState, InfoDict]:
-        sample_key, rollout_key = jax.random.split(key)
+    ) -> tuple[None, Action]:
+        del state
+        key_sample, key_rollout = jax.random.split(key)
 
+        mean = zeros_mean(self.low, self.horizon)
+        std = jax.tree.map(lambda leaf: jnp.full_like(leaf, self.std), mean)
         candidates = sample_gaussian_actions(
-            sample_key, state.mean, state.std, self.num_samples, self.low, self.high
+            key_sample, mean, std, self.num_samples, self.low, self.high
         )
 
-        def rollout_and_score(k: Key, actions: Action) -> Array:
-            observations = rollout(k, dynamics_state, actions, self.dynamics)
-            return self.cost_fn(observations, actions)
-
-        rollout_keys = jax.random.split(rollout_key, self.num_samples)
-        costs = jax.vmap(rollout_and_score)(rollout_keys, candidates)
+        costs = score_candidates(
+            key_rollout, dynamics_state, candidates, self.dynamics, self.cost_fn
+        )
 
         best_idx = jnp.argmin(costs)
-        best_actions = jax.tree_util.tree_map(lambda leaf: leaf[best_idx], candidates)
+        best_actions = jax.tree.map(lambda leaf: leaf[best_idx], candidates)
 
-        info = {"best_cost": costs[best_idx], "mean_cost": jnp.mean(costs)}
-        return best_actions, state, info
+        lox.log(
+            {"best_cost": costs[best_idx], "mean_cost": jnp.mean(costs)},
+            tags=("ctrlax",),
+        )
+        return None, best_actions

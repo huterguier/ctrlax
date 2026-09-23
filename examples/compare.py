@@ -9,6 +9,7 @@ from pathlib import Path
 
 import jax
 import jax.numpy as jnp
+import lox
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from point_mass import GOAL, PointMassState, bounds, cost_fn, toy_dynamics
@@ -34,18 +35,19 @@ SURFACE = "#fcfcfb"
 
 def run(solver, num_steps=NUM_STEPS):
     solver_state = solver.init()
+    step = jax.jit(lox.spool(solver.step))
 
     key = jax.random.key(SEED)
     dynamics_state = PointMassState(pos=jnp.array(0.0), vel=jnp.array(0.0))
 
     positions, best_costs = [], []
     for _ in range(num_steps):
-        key, plan_key, env_key = jax.random.split(key, 3)
-        plan, solver_state, info = solver.step(plan_key, solver_state, dynamics_state)
-        action = jax.tree_util.tree_map(lambda leaf: leaf[0], plan)
-        dynamics_state, _ = toy_dynamics(env_key, dynamics_state, action)
+        key, key_plan, key_env = jax.random.split(key, 3)
+        (solver_state, plan), logs = step(key_plan, solver_state, dynamics_state)
+        action = jax.tree.map(lambda leaf: leaf[0], plan)
+        dynamics_state, _ = toy_dynamics(key_env, dynamics_state, action)
         positions.append(float(dynamics_state.pos))
-        best_costs.append(float(info["best_cost"]))
+        best_costs.append(float(logs["best_cost"][-1]))
     return positions, best_costs
 
 
